@@ -130,11 +130,20 @@ def process_participant_data(exp_data):
         'gender': exp_data['gender'],
         'age': exp_data['age'],
         'experiment_date': exp_data['experiment_date'],
-        'task_weight_list': exp_data['task_weight_list'],
+        'task_weight_list': exp_data.get('task_weight_list', [0.1, 0.3, 0.5]),
     }
     
     trials_metrics = []
-    for trial in exp_data['trials']:
+    # 兼容新旧数据格式
+    if 'phase1' in exp_data:
+        trials = exp_data['phase1']['trials']
+    elif 'trials' in exp_data:
+        trials = exp_data['trials']
+    else:
+        print(f"[WARNING] No trials found for participant {exp_data['participant_id']}")
+        trials = []
+    
+    for trial in trials:
         metrics = extract_trial_metrics(trial)
         trials_metrics.append(metrics)
     

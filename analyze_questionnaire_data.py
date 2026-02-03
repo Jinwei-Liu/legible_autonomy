@@ -67,7 +67,16 @@ def extract_questionnaire_data(all_data):
     for participant in all_data:
         participant_id = participant['participant_id']
         
-        for trial in participant['trials']:
+        # 兼容新旧数据格式
+        if 'phase1' in participant:
+            trials = participant['phase1']['trials']
+        elif 'trials' in participant:
+            trials = participant['trials']
+        else:
+            print(f"[WARNING] No trials found for participant {participant_id}")
+            trials = []
+        
+        for trial in trials:
             if 'questionnaire' in trial:
                 q_data = trial['questionnaire']
                 questionnaire_data.append({

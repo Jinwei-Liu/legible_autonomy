@@ -1,6 +1,7 @@
 """
 Experiment Data Collection for Legible Shared Autonomy
-In-game questionnaire with D-pad control
+Phase 1: In-game questionnaire with D-pad control
+Phase 2: Task weight testing with subjective rating per weight
 """
 
 import pygame
@@ -12,6 +13,7 @@ import json
 import os
 from datetime import datetime
 import random
+import time
 
 sys.path.append('..')
 
@@ -200,6 +202,152 @@ class InGameQuestionnaire:
         self.screen.blit(confirm_surface, (self.x_offset, y))
 
 
+class SubjectiveQuestionnaire:
+    def __init__(self, screen, task_weight):
+        self.screen = screen
+        self.task_weight = task_weight
+        self.font_large = pygame.font.Font(None, 32)
+        self.font_medium = pygame.font.Font(None, 26)
+        self.font_small = pygame.font.Font(None, 22)
+        
+        self.question_index = 0
+        self.intuitiveness_score = 5
+        self.collaboration_score = 5
+        self.completed = False
+        
+        self.slider_x = WIDTH // 2 - 200
+        self.slider_width = 400
+        self.slider_height = 20
+        self.dragging = False
+    
+    def handle_input(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            slider_y = HEIGHT // 2
+            if self._is_on_slider(event.pos, slider_y):
+                self.dragging = True
+                score_type = 'intuitiveness' if self.question_index == 0 else 'collaboration'
+                self._update_score_from_pos(event.pos[0], score_type)
+        
+        elif event.type == pygame.MOUSEBUTTONUP:
+            self.dragging = False
+        
+        elif event.type == pygame.MOUSEMOTION and self.dragging:
+            score_type = 'intuitiveness' if self.question_index == 0 else 'collaboration'
+            self._update_score_from_pos(event.pos[0], score_type)
+        
+        elif event.type == pygame.JOYBUTTONDOWN:
+            if event.button == 1:
+                self.confirm_selection()
+            elif event.button == 11:
+                if self.question_index == 0:
+                    self.intuitiveness_score = min(10, self.intuitiveness_score + 1)
+                else:
+                    self.collaboration_score = min(10, self.collaboration_score + 1)
+            elif event.button == 12:
+                if self.question_index == 0:
+                    self.intuitiveness_score = max(1, self.intuitiveness_score - 1)
+                else:
+                    self.collaboration_score = max(1, self.collaboration_score - 1)
+    
+    def _is_on_slider(self, pos, slider_y):
+        return (self.slider_x <= pos[0] <= self.slider_x + self.slider_width and
+                slider_y - 20 <= pos[1] <= slider_y + 20)
+    
+    def _update_score_from_pos(self, mouse_x, score_type):
+        relative_x = max(0, min(self.slider_width, mouse_x - self.slider_x))
+        score = int(relative_x / self.slider_width * 9) + 1
+        
+        if score_type == 'intuitiveness':
+            self.intuitiveness_score = score
+        else:
+            self.collaboration_score = score
+    
+    def confirm_selection(self):
+        if self.question_index == 0:
+            self.question_index = 1
+        else:
+            self.completed = True
+    
+    def draw(self):
+        self.screen.fill(BLACK)
+        
+        title_text = f"Task Weight {self.task_weight:.1f} - Questionnaire"
+        title_surface = self.font_large.render(title_text, True, YELLOW)
+        title_rect = title_surface.get_rect(center=(WIDTH // 2, 60))
+        self.screen.blit(title_surface, title_rect)
+        
+        if self.question_index == 0:
+            q_text = "How intuitive was the system's behavior?"
+            q_surface = self.font_medium.render(q_text, True, WHITE)
+            q_rect = q_surface.get_rect(center=(WIDTH // 2, 160))
+            self.screen.blit(q_surface, q_rect)
+            
+            slider_y = HEIGHT // 2
+            self._draw_slider(slider_y, self.intuitiveness_score)
+            
+        else:
+            result_text = f"Intuitiveness: {self.intuitiveness_score}/10"
+            result_surface = self.font_small.render(result_text, True, (150, 150, 150))
+            result_rect = result_surface.get_rect(center=(WIDTH // 2, 110))
+            self.screen.blit(result_surface, result_rect)
+            
+            q_text = "To what extent do you want to collaborate with this system?"
+            q_surface = self.font_medium.render(q_text, True, WHITE)
+            q_rect = q_surface.get_rect(center=(WIDTH // 2, 160))
+            self.screen.blit(q_surface, q_rect)
+            
+            slider_y = HEIGHT // 2
+            self._draw_slider(slider_y, self.collaboration_score)
+        
+        instr_y = HEIGHT - 120
+        instr_text = "Drag slider or use D-pad Up/Down"
+        instr_surface = self.font_small.render(instr_text, True, (200, 200, 200))
+        instr_rect = instr_surface.get_rect(center=(WIDTH // 2, instr_y))
+        self.screen.blit(instr_surface, instr_rect)
+        
+        instr_text2 = "Press ○ to confirm"
+        instr_surface2 = self.font_small.render(instr_text2, True, (200, 200, 200))
+        instr_rect2 = instr_surface2.get_rect(center=(WIDTH // 2, instr_y + 30))
+        self.screen.blit(instr_surface2, instr_rect2)
+    
+    def _draw_slider(self, center_y, score):
+        slider_rect = pygame.Rect(self.slider_x, center_y - self.slider_height // 2, 
+                                  self.slider_width, self.slider_height)
+        pygame.draw.rect(self.screen, (80, 80, 80), slider_rect)
+        pygame.draw.rect(self.screen, WHITE, slider_rect, 2)
+        
+        for i in range(1, 11):
+            tick_x = self.slider_x + (i - 1) * self.slider_width / 9
+            tick_y_start = center_y - self.slider_height // 2 - 5
+            tick_y_end = center_y - self.slider_height // 2
+            pygame.draw.line(self.screen, WHITE, (tick_x, tick_y_start), (tick_x, tick_y_end), 2)
+            
+            label_surface = self.font_small.render(str(i), True, WHITE)
+            label_rect = label_surface.get_rect(center=(tick_x, center_y + self.slider_height + 15))
+            self.screen.blit(label_surface, label_rect)
+        
+        handle_x = self.slider_x + (score - 1) * self.slider_width / 9
+        handle_rect = pygame.Rect(handle_x - 10, center_y - 15, 20, 30)
+        pygame.draw.rect(self.screen, CYAN, handle_rect)
+        pygame.draw.rect(self.screen, WHITE, handle_rect, 2)
+        
+        score_text = f"Score: {score} / 10"
+        score_surface = self.font_medium.render(score_text, True, CYAN)
+        score_rect = score_surface.get_rect(center=(WIDTH // 2, center_y + 70))
+        self.screen.blit(score_surface, score_rect)
+        
+        left_label = "Not intuitive" if self.question_index == 0 else "Not at all"
+        right_label = "Very intuitive" if self.question_index == 0 else "Very much"
+        
+        left_surface = self.font_small.render(left_label, True, (200, 200, 200))
+        left_rect = left_surface.get_rect(center=(self.slider_x - 80, center_y))
+        self.screen.blit(left_surface, left_rect)
+        
+        right_surface = self.font_small.render(right_label, True, (200, 200, 200))
+        right_rect = right_surface.get_rect(center=(self.slider_x + self.slider_width + 80, center_y))
+        self.screen.blit(right_surface, right_rect)
+
+
 class ExperimentSession:
     def __init__(self, participant_id, gender, age):
         self.participant_id = participant_id
@@ -207,10 +355,12 @@ class ExperimentSession:
         self.age = age
         
         pygame.init()
+        pygame.mouse.set_visible(True)
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Legible Shared Autonomy Experiment")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
+        self.font_large = pygame.font.Font(None, 48)
         self.font_small = pygame.font.Font(None, 24)
         
         pygame.joystick.init()
@@ -237,6 +387,8 @@ class ExperimentSession:
         
         self.data_dir = "experiment_data"
         os.makedirs(self.data_dir, exist_ok=True)
+        
+        self.phase2_trials = []
     
     def generate_trial_sequence(self):
         trials = []
@@ -262,6 +414,8 @@ class ExperimentSession:
         
         self.show_instruction_screen(target_goal_idx, task_weight)
         
+        self.clock.tick()
+        
         trial_data = {
             'trial_num': self.current_trial + 1,
             'task_weight': task_weight,
@@ -275,6 +429,10 @@ class ExperimentSession:
         paused = False
         midpoint_triggered = False
         questionnaire = None
+        
+        trajectory = []
+        max_trajectory_points = 50
+        trajectory_lifetime = 2.0
         
         initial_distance = np.linalg.norm(target_goal - robot_pos)
         
@@ -324,6 +482,17 @@ class ExperimentSession:
                 robot_pos += executed * dt
                 robot_pos = np.clip(robot_pos, [0, 0], [WIDTH, HEIGHT])
                 
+                current_time = time.time()
+                trajectory.append({
+                    'pos': robot_pos.copy(),
+                    'time': current_time
+                })
+                
+                trajectory = [t for t in trajectory if current_time - t['time'] < trajectory_lifetime]
+                
+                if len(trajectory) > max_trajectory_points:
+                    trajectory = trajectory[-max_trajectory_points:]
+                
                 trial_data['frames'].append({
                     'time': datetime.now().isoformat(),
                     'position': robot_pos.tolist(),
@@ -350,14 +519,23 @@ class ExperimentSession:
             for i, goal in enumerate(self.goals):
                 draw_goal(self.screen, goal, 15, GREEN, f"G{i}", self.font_small)
             
-            pygame.draw.circle(self.screen, RED, robot_pos.astype(int), 10)
+            if len(trajectory) > 1:
+                current_time = time.time()
+                
+                for i in range(len(trajectory) - 1):
+                    age = current_time - trajectory[i]['time']
+                    alpha = max(0.0, 1.0 - (age / trajectory_lifetime))
+                    
+                    color_intensity = int(255 * alpha)
+                    trail_color = (color_intensity, color_intensity, color_intensity)
+                    
+                    line_width = max(1, int(3 * alpha))
+                    
+                    start_pos = trajectory[i]['pos'].astype(int)
+                    end_pos = trajectory[i + 1]['pos'].astype(int)
+                    pygame.draw.line(self.screen, trail_color, start_pos, end_pos, line_width)
             
-            if not paused:
-                scale = 0.5
-                if np.linalg.norm(user_input) > 1:
-                    draw_arrow(self.screen, robot_pos, robot_pos + user_input * scale, WHITE, 2)
-                if 'executed' in locals() and np.linalg.norm(executed) > 1:
-                    draw_arrow(self.screen, robot_pos, robot_pos + executed * scale, YELLOW, 2)
+            pygame.draw.circle(self.screen, RED, robot_pos.astype(int), 10)
             
             target_text = f"YOUR GOAL: {self.goal_names[target_goal_idx]}"
             text_surface = self.font.render(target_text, True, CYAN)
@@ -419,6 +597,243 @@ class ExperimentSession:
                     if event.button == 1:
                         waiting = False
     
+    def run_phase2_trial(self, trial_info, trial_num):
+        task_weight = trial_info['task_weight']
+        target_goal_idx = trial_info['target_goal_idx']
+        target_goal = self.goals[target_goal_idx]
+        
+        robot_pos = self.start_pos.copy()
+        sa = LegibleSharedAutonomy(self.goals)
+        sa.task_weight = task_weight
+        
+        self.show_phase2_instruction_screen(target_goal_idx, task_weight, trial_num)
+        
+        self.clock.tick()
+        
+        trial_data = {
+            'trial_num': trial_num + 1,
+            'task_weight': task_weight,
+            'target_goal_idx': target_goal_idx,
+            'target_goal': self.goal_names[target_goal_idx],
+            'start_time': datetime.now().isoformat(),
+            'frames': []
+        }
+        
+        running = True
+        trajectory = []
+        max_trajectory_points = 50
+        trajectory_lifetime = 2.0
+        
+        while running:
+            dt = self.clock.tick(30) / 1000.0
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return None
+            
+            user_input = np.array([0.0, 0.0])
+            
+            if self.joystick:
+                x_axis = self.joystick.get_axis(0)
+                y_axis = self.joystick.get_axis(1)
+                
+                if abs(x_axis) > 0.1 or abs(y_axis) > 0.1:
+                    user_input = np.array([x_axis, y_axis]) * USER_SPEED
+            
+            sa.update_belief(robot_pos, user_input)
+            robot_action = sa.compute_robot_action(robot_pos, user_input)
+            
+            if np.linalg.norm(user_input) < 0.01:
+                executed = robot_action
+            else:
+                executed = sa.beta * user_input + (1 - sa.beta) * robot_action
+            
+            robot_pos += executed * dt
+            robot_pos = np.clip(robot_pos, [0, 0], [WIDTH, HEIGHT])
+            
+            current_time = time.time()
+            trajectory.append({
+                'pos': robot_pos.copy(),
+                'time': current_time
+            })
+            
+            trajectory = [t for t in trajectory if current_time - t['time'] < trajectory_lifetime]
+            
+            if len(trajectory) > max_trajectory_points:
+                trajectory = trajectory[-max_trajectory_points:]
+            
+            trial_data['frames'].append({
+                'time': datetime.now().isoformat(),
+                'position': robot_pos.tolist(),
+                'user_input': user_input.tolist(),
+                'robot_action': robot_action.tolist(),
+                'executed': executed.tolist(),
+                'beliefs': sa.beliefs.tolist(),
+                'beta': sa.beta
+            })
+            
+            if np.linalg.norm(target_goal - robot_pos) < 30:
+                running = False
+            
+            self.screen.fill(BLACK)
+            
+            weight_text = f"Task Weight: {task_weight:.1f}"
+            weight_surface = self.font_large.render(weight_text, True, YELLOW)
+            weight_rect = weight_surface.get_rect(center=(WIDTH // 2, 40))
+            bg_rect = weight_rect.inflate(40, 20)
+            pygame.draw.rect(self.screen, (50, 50, 50), bg_rect)
+            pygame.draw.rect(self.screen, YELLOW, bg_rect, 3)
+            self.screen.blit(weight_surface, weight_rect)
+            
+            for i, goal in enumerate(self.goals):
+                draw_goal(self.screen, goal, 15, GREEN, f"G{i}", self.font_small)
+            
+            if len(trajectory) > 1:
+                current_time = time.time()
+                
+                for i in range(len(trajectory) - 1):
+                    age = current_time - trajectory[i]['time']
+                    alpha = max(0.0, 1.0 - (age / trajectory_lifetime))
+                    
+                    color_intensity = int(255 * alpha)
+                    trail_color = (color_intensity, color_intensity, color_intensity)
+                    
+                    line_width = max(1, int(3 * alpha))
+                    
+                    start_pos = trajectory[i]['pos'].astype(int)
+                    end_pos = trajectory[i + 1]['pos'].astype(int)
+                    pygame.draw.line(self.screen, trail_color, start_pos, end_pos, line_width)
+            
+            pygame.draw.circle(self.screen, RED, robot_pos.astype(int), 10)
+            
+            target_text = f"YOUR GOAL: {self.goal_names[target_goal_idx]}"
+            text_surface = self.font.render(target_text, True, CYAN)
+            bg_rect = text_surface.get_rect(topleft=(10, HEIGHT - 60))
+            bg_rect.inflate_ip(20, 10)
+            pygame.draw.rect(self.screen, (50, 50, 50), bg_rect)
+            self.screen.blit(text_surface, (15, HEIGHT - 55))
+            
+            info_text = f"Phase 2 - Trial {trial_num + 1}/3"
+            text_surface = self.font_small.render(info_text, True, WHITE)
+            self.screen.blit(text_surface, (10, HEIGHT - 30))
+            
+            pygame.display.flip()
+        
+        trial_data['end_time'] = datetime.now().isoformat()
+        trial_data['final_position'] = robot_pos.tolist()
+        
+        questionnaire = SubjectiveQuestionnaire(self.screen, task_weight)
+        
+        while not questionnaire.completed:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return None
+                questionnaire.handle_input(event)
+            
+            questionnaire.draw()
+            pygame.display.flip()
+            self.clock.tick(60)
+        
+        trial_data['questionnaire'] = {
+            'intuitiveness_score': questionnaire.intuitiveness_score,
+            'collaboration_score': questionnaire.collaboration_score,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        return trial_data
+    
+    def show_phase2_instruction_screen(self, target_goal_idx, task_weight, trial_num):
+        self.screen.fill(BLACK)
+        
+        phase_text = "Phase 2"
+        phase_surface = self.font.render(phase_text, True, YELLOW)
+        phase_rect = phase_surface.get_rect(center=(WIDTH // 2, 80))
+        self.screen.blit(phase_surface, phase_rect)
+        
+        weight_text = f"Task Weight: {task_weight:.1f}"
+        weight_surface = self.font_large.render(weight_text, True, CYAN)
+        weight_rect = weight_surface.get_rect(center=(WIDTH // 2, 150))
+        bg_rect = weight_rect.inflate(40, 20)
+        pygame.draw.rect(self.screen, (50, 50, 50), bg_rect)
+        pygame.draw.rect(self.screen, CYAN, bg_rect, 3)
+        self.screen.blit(weight_surface, weight_rect)
+        
+        lines = [
+            f"Trial {trial_num + 1} / 3",
+            "",
+            f"YOUR GOAL: {self.goal_names[target_goal_idx]}",
+            "",
+            "Use LEFT STICK to control",
+            "",
+            "Press ○ to start"
+        ]
+        
+        y = 230
+        for line in lines:
+            if "YOUR GOAL" in line:
+                color = GREEN
+                font = self.font
+            else:
+                color = WHITE
+                font = self.font_small
+            
+            text_surface = font.render(line, True, color)
+            text_rect = text_surface.get_rect(center=(WIDTH // 2, y))
+            self.screen.blit(text_surface, text_rect)
+            y += 50 if font == self.font else 35
+        
+        pygame.display.flip()
+        
+        waiting = True
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.JOYBUTTONDOWN:
+                    if event.button == 1:
+                        waiting = False
+    
+    def show_phase_transition_screen(self):
+        self.screen.fill(BLACK)
+        
+        lines = [
+            "Phase 1 Complete!",
+            "",
+            "Starting Phase 2...",
+            "",
+            "You will test 3 different task weights",
+            "and rate each one after testing",
+            "",
+            "Press ○ to continue"
+        ]
+        
+        y = 150
+        for i, line in enumerate(lines):
+            if i == 0:
+                color = GREEN
+                font = self.font
+            else:
+                color = WHITE
+                font = self.font_small
+            
+            text_surface = font.render(line, True, color)
+            text_rect = text_surface.get_rect(center=(WIDTH // 2, y))
+            self.screen.blit(text_surface, text_rect)
+            y += 50 if font == self.font else 30
+        
+        pygame.display.flip()
+        
+        waiting = True
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.JOYBUTTONDOWN:
+                    if event.button == 1:
+                        waiting = False
+    
     def run_experiment(self):
         for trial_info in self.trial_sequence:
             self.current_trial = self.trial_sequence.index(trial_info)
@@ -431,6 +846,25 @@ class ExperimentSession:
             self.all_trial_data.append(trial_data)
             self.save_data()
         
+        self.show_phase_transition_screen()
+        
+        phase2_sequence = []
+        for tw in TASK_WEIGHT_LIST:
+            target_goal_idx = random.choice([0, 1])
+            phase2_sequence.append({
+                'task_weight': tw,
+                'target_goal_idx': target_goal_idx
+            })
+        
+        for i, trial_info in enumerate(phase2_sequence):
+            trial_data = self.run_phase2_trial(trial_info, i)
+            
+            if trial_data is None:
+                break
+            
+            self.phase2_trials.append(trial_data)
+        
+        self.save_data()
         self.show_completion_screen()
         
         if self.joystick:
@@ -444,9 +878,16 @@ class ExperimentSession:
             'age': self.age,
             'experiment_date': datetime.now().isoformat(),
             'task_weight_list': TASK_WEIGHT_LIST,
-            'trials_per_condition': TRIALS_PER_CONDITION,
-            'trials': self.all_trial_data
+            'phase1': {
+                'trials_per_condition': TRIALS_PER_CONDITION,
+                'trials': self.all_trial_data
+            }
         }
+        
+        if self.phase2_trials:
+            data['phase2'] = {
+                'trials': self.phase2_trials
+            }
         
         filename = f"{self.data_dir}/participant_{self.participant_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         
@@ -463,7 +904,8 @@ class ExperimentSession:
             "",
             "Thank you for your participation.",
             "",
-            f"Total trials completed: {len(self.all_trial_data)}",
+            f"Phase 1: {len(self.all_trial_data)} trials",
+            f"Phase 2: {len(self.phase2_trials)} trials",
             "",
             "Press any button to exit"
         ]
@@ -480,7 +922,7 @@ class ExperimentSession:
             text_surface = font.render(line, True, color)
             text_rect = text_surface.get_rect(center=(WIDTH // 2, y))
             self.screen.blit(text_surface, text_rect)
-            y += 50 if font == self.font else 35
+            y += 50 if font == self.font else 30
         
         pygame.display.flip()
         
@@ -511,3 +953,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
