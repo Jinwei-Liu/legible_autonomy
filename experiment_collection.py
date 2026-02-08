@@ -1,9 +1,3 @@
-"""
-Experiment Data Collection for Legible Shared Autonomy
-Phase 1: In-game questionnaire with D-pad control
-Phase 2: Task weight testing with subjective rating per weight
-"""
-
 import pygame
 import numpy as np
 import sys
@@ -21,7 +15,6 @@ from core.shared_autonomy import LegibleSharedAutonomy
 from utils.visualization import draw_arrow, draw_goal
 from config import (WIDTH, HEIGHT, BLACK, WHITE, RED, GREEN, BLUE, YELLOW, CYAN, 
                    USER_SPEED, TASK_WEIGHT_LIST, TRIALS_PER_CONDITION, MIDPOINT_THRESHOLD)
-
 
 class ParticipantDialog:
     def __init__(self):
@@ -429,6 +422,7 @@ class ExperimentSession:
         paused = False
         midpoint_triggered = False
         questionnaire = None
+        user_has_input = False  # 添加标志：用户是否已经输入过
         
         trajectory = []
         max_trajectory_points = 50
@@ -470,11 +464,15 @@ class ExperimentSession:
                     
                     if abs(x_axis) > 0.1 or abs(y_axis) > 0.1:
                         user_input = np.array([x_axis, y_axis]) * USER_SPEED
+                        user_has_input = True  # 标记用户已经输入
                 
                 sa.update_belief(robot_pos, user_input)
                 robot_action = sa.compute_robot_action(robot_pos, user_input)
                 
-                if np.linalg.norm(user_input) < 0.01:
+                # 修改：只有在用户输入过之后才执行动作
+                if not user_has_input:
+                    executed = np.array([0.0, 0.0])  # 保持静止
+                elif np.linalg.norm(user_input) < 0.01:
                     executed = robot_action
                 else:
                     executed = sa.beta * user_input + (1 - sa.beta) * robot_action
@@ -620,6 +618,7 @@ class ExperimentSession:
         }
         
         running = True
+        user_has_input = False  # 添加标志：用户是否已经输入过
         trajectory = []
         max_trajectory_points = 50
         trajectory_lifetime = 2.0
@@ -639,11 +638,15 @@ class ExperimentSession:
                 
                 if abs(x_axis) > 0.1 or abs(y_axis) > 0.1:
                     user_input = np.array([x_axis, y_axis]) * USER_SPEED
+                    user_has_input = True  # 标记用户已经输入
             
             sa.update_belief(robot_pos, user_input)
             robot_action = sa.compute_robot_action(robot_pos, user_input)
             
-            if np.linalg.norm(user_input) < 0.01:
+            # 修改：只有在用户输入过之后才执行动作
+            if not user_has_input:
+                executed = np.array([0.0, 0.0])  # 保持静止
+            elif np.linalg.norm(user_input) < 0.01:
                 executed = robot_action
             else:
                 executed = sa.beta * user_input + (1 - sa.beta) * robot_action
@@ -953,4 +956,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    

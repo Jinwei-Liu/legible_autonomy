@@ -34,7 +34,6 @@ COLORS = {
 }
 
 def load_experiment_data(data_dir='experiment_data'):
-    """Load all experiment data from JSON files"""
     data_path = Path(data_dir)
     all_data = []
     
@@ -49,6 +48,8 @@ def load_experiment_data(data_dir='experiment_data'):
                 participant_files[pid] = []
             participant_files[pid].append(json_file)
     
+    print(f"   Found {sum(len(files) for files in participant_files.values())} total files for {len(participant_files)} participant(s)")
+    
     # For each participant, only load the LATEST (largest) file
     for pid, files in participant_files.items():
         # Sort by file size (larger = more complete) or by timestamp in filename
@@ -56,18 +57,19 @@ def load_experiment_data(data_dir='experiment_data'):
         with open(latest_file, 'r') as f:
             participant_data = json.load(f)
             all_data.append(participant_data)
-            print(f"   Loaded {latest_file.name} (most complete file for participant {pid})")
+            if len(files) > 1:
+                print(f"   Participant {pid}: loaded {latest_file.name} (most complete of {len(files)} files)")
+            else:
+                print(f"   Participant {pid}: loaded {latest_file.name}")
     
     return all_data
 
 def extract_questionnaire_data(all_data):
-    """Extract questionnaire responses from experiment data"""
     questionnaire_data = []
     
     for participant in all_data:
         participant_id = participant['participant_id']
         
-        # 兼容新旧数据格式
         if 'phase1' in participant:
             trials = participant['phase1']['trials']
         elif 'trials' in participant:
@@ -92,7 +94,6 @@ def extract_questionnaire_data(all_data):
     return questionnaire_data
 
 def analyze_participant_questionnaire(participant_id, questionnaire_data, output_dir='questionnaire_results'):
-    """Create comprehensive questionnaire analysis for a single participant (by task weight)"""
     
     # Filter data for this participant
     p_data = [q for q in questionnaire_data if q['participant_id'] == participant_id]
@@ -324,7 +325,6 @@ def analyze_participant_questionnaire(participant_id, questionnaire_data, output
     print(f"Saved participant {participant_id} questionnaire analysis to {output_file}")
 
 def analyze_overall_questionnaire(questionnaire_data, output_dir='questionnaire_results'):
-    """Create overall summary of questionnaire data by task weight"""
     
     if not questionnaire_data:
         print("No questionnaire data to analyze")
@@ -574,7 +574,6 @@ def analyze_overall_questionnaire(questionnaire_data, output_dir='questionnaire_
     print(f"Saved overall questionnaire analysis to {output_file}")
 
 def main():
-    """Main analysis function"""
     
     print("="*60)
     print("QUESTIONNAIRE DATA ANALYSIS (BY TASK WEIGHT)")

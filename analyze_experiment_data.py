@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-Legible Autonomy实验数据分析脚本
-分析共享自主控制实验的轨迹、信念和性能数据
-参考Nature风格绘图规范
-"""
 
 import os
 import json
@@ -21,7 +16,6 @@ warnings.filterwarnings('ignore')
 # Nature Style Configuration
 # ============================================================================
 def setup_nature_style():
-    """Setup matplotlib for Nature-style figures"""
     plt.rcParams.update({
         'font.family': 'sans-serif',
         'font.sans-serif': ['DejaVu Sans', 'Helvetica', 'Arial', 'Liberation Sans'],
@@ -67,25 +61,68 @@ TASK_WEIGHT_COLORS = ['#E64B35', '#4DBBD5', '#00A087']  # 0.1, 0.3, 0.5
 # Data Loading and Processing
 # ============================================================================
 def load_all_experiment_data(data_dir):
-    """加载所有实验数据文件"""
+    """
+    只加载每个参与者的最终数据文件，避免重复
+    """
+    participants = {}
+    
     json_files = glob.glob(os.path.join(data_dir, '*.json'))
     
-    all_data = []
+    if not json_files:
+        print(f"[WARNING] No JSON files found in {data_dir}")
+        return []
+    
+    print(f"[INFO] Found {len(json_files)} JSON files")
+    
+    # 按participant_id分组，只保留最完整的文件
     for filepath in sorted(json_files):
         with open(filepath, 'r') as f:
             data = json.load(f)
             data['filepath'] = filepath
-            all_data.append(data)
+            
+            pid = data['participant_id']
+            
+            # 计算trials数量
+            phase1_trials = 0
+            if 'phase1' in data and 'trials' in data['phase1']:
+                phase1_trials = len(data['phase1']['trials'])
+            elif 'trials' in data:
+                phase1_trials = len(data['trials'])
+            
+            phase2_trials = 0
+            if 'phase2' in data and 'trials' in data['phase2']:
+                phase2_trials = len(data['phase2']['trials'])
+            
+            total_trials = phase1_trials + phase2_trials
+            file_size = os.path.getsize(filepath)
+            
+            # 只保留最完整的文件
+            if pid not in participants:
+                participants[pid] = {
+                    'data': data,
+                    'total_trials': total_trials,
+                    'file_size': file_size
+                }
+                print(f"  Participant {pid}: {total_trials} trials")
+            else:
+                stored = participants[pid]
+                # 优先选择trials更多的，其次选择文件更大的
+                if (total_trials > stored['total_trials'] or 
+                    (total_trials == stored['total_trials'] and file_size > stored['file_size'])):
+                    participants[pid]['data'] = data
+                    participants[pid]['total_trials'] = total_trials
+                    participants[pid]['file_size'] = file_size
+                    print(f"  Participant {pid}: updated to {total_trials} trials (more complete)")
     
-    print(f"[INFO] 加载了 {len(all_data)} 个实验数据文件")
-    return all_data
+    final_data = [p['data'] for p in participants.values()]
+    print(f"[INFO] Loaded final data for {len(final_data)} unique participant(s)")
+    
+    return final_data
 
 
 def extract_trial_metrics(trial):
-    """提取单个trial的关键指标"""
     frames = trial['frames']
     
-    # 轨迹数据
     positions = np.array([f['position'] for f in frames])
     user_inputs = np.array([f['user_input'] for f in frames])
     robot_actions = np.array([f['robot_action'] for f in frames])
@@ -93,12 +130,10 @@ def extract_trial_metrics(trial):
     beliefs = np.array([f['beliefs'] for f in frames])
     betas = np.array([f['beta'] for f in frames])
     
-    # 时间序列
     times = [datetime.fromisoformat(f['time']) for f in frames]
     start_time = times[0]
     time_series = [(t - start_time).total_seconds() for t in times]
     
-    # 计算指标
     metrics = {
         'trial_num': trial['trial_num'],
         'task_weight': trial['task_weight'],
@@ -124,7 +159,6 @@ def extract_trial_metrics(trial):
 
 
 def process_participant_data(exp_data):
-    """处理单个参与者的所有trials"""
     participant_info = {
         'participant_id': exp_data['participant_id'],
         'gender': exp_data['gender'],
@@ -134,7 +168,6 @@ def process_participant_data(exp_data):
     }
     
     trials_metrics = []
-    # 兼容新旧数据格式
     if 'phase1' in exp_data:
         trials = exp_data['phase1']['trials']
     elif 'trials' in exp_data:
@@ -154,7 +187,6 @@ def process_participant_data(exp_data):
 # Individual Participant Analysis
 # ============================================================================
 def plot_participant_analysis(participant_info, trials_metrics, output_dir):
-    """为单个参与者生成综合分析图"""
     setup_nature_style()
     
     participant_id = participant_info['participant_id']
@@ -162,10 +194,8 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     fig = plt.figure(figsize=(16, 10))
     gs = gridspec.GridSpec(3, 3, hspace=0.35, wspace=0.35)
     
-    # ===== (a) 轨迹可视化 =====
     ax1 = fig.add_subplot(gs[0, 0])
     
-    # 假设目标位置（根据实际情况调整）
     goal_positions = {
         0: (400, 100),  # Goal 0 (Top)
         1: (400, 500),  # Goal 1 (Bottom)
@@ -180,7 +210,6 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
         ax1.plot(positions[:, 0], positions[:, 1], 
                 alpha=0.6, linewidth=1.5, color=color)
     
-    # 绘制目标
     for goal_idx, pos in goal_positions.items():
         ax1.scatter(pos[0], pos[1], s=200, c=GOAL_COLORS[goal_idx], 
                    marker='*', edgecolors='black', linewidths=1, 
@@ -193,10 +222,9 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     ax1.legend(loc='best', frameon=False, fontsize=8)
     ax1.set_aspect('equal', adjustable='box')
     
-    # ===== (b) 信念演化 =====
     ax2 = fig.add_subplot(gs[0, 1])
     
-    for trial in trials_metrics[:5]:  # 只显示前5个trial避免过于拥挤
+    for trial in trials_metrics[:5]:  
         time_series = trial['time_series']
         beliefs = trial['beliefs']
         
@@ -211,7 +239,6 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     ax2.set_title('(b) Belief Evolution', fontsize=12, fontweight='normal')
     ax2.set_ylim(-0.05, 1.05)
     
-    # ===== (c) Beta (自适应权重) 变化 =====
     ax3 = fig.add_subplot(gs[0, 2])
     
     for trial in trials_metrics[:5]:
@@ -227,7 +254,6 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     ax3.set_ylabel('Beta (Adaptation Weight)', fontsize=11)
     ax3.set_title('(c) Adaptive Weight Evolution', fontsize=12, fontweight='normal')
     
-    # ===== (d) 完成时间对比 =====
     ax4 = fig.add_subplot(gs[1, 0])
     
     task_weights = sorted(set([t['task_weight'] for t in trials_metrics]))
@@ -250,7 +276,6 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     ax4.set_xticks(positions_bar)
     ax4.set_xticklabels([f'{tw:.1f}' for tw in task_weights])
     
-    # ===== (e) 轨迹长度对比 =====
     ax5 = fig.add_subplot(gs[1, 1])
     
     lengths_by_weight = {tw: [] for tw in task_weights}
@@ -270,7 +295,6 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     ax5.set_xticks(positions_bar)
     ax5.set_xticklabels([f'{tw:.1f}' for tw in task_weights])
     
-    # ===== (f) 用户输入 vs 机器人动作 =====
     ax6 = fig.add_subplot(gs[1, 2])
     
     user_norms = [t['avg_user_input_norm'] for t in trials_metrics]
@@ -287,7 +311,6 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     ax6.set_title('(f) User Input vs Robot Action', fontsize=12, fontweight='normal')
     ax6.legend(loc='best', frameon=False, fontsize=8)
     
-    # ===== (g) 最终信念分布 =====
     ax7 = fig.add_subplot(gs[2, 0])
     
     final_beliefs_0 = [t['final_belief_0'] for t in trials_metrics]
@@ -306,7 +329,6 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     ax7.set_title('(g) Final Belief Distribution', fontsize=12, fontweight='normal')
     ax7.legend(loc='best', frameon=False, fontsize=8)
     
-    # ===== (h) 性能汇总表 =====
     ax8 = fig.add_subplot(gs[2, 1:])
     ax8.axis('off')
     
@@ -330,7 +352,6 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     table.set_fontsize(9)
     table.scale(1, 2)
     
-    # 设置表头样式
     for i in range(5):
         table[(0, i)].set_facecolor('#E0E0E0')
         table[(0, i)].set_text_props(weight='bold')
@@ -338,10 +359,10 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     ax8.set_title('(h) Performance Summary Statistics', 
                  fontsize=12, fontweight='normal', pad=20)
     
-    # 保存图片
-    plt.savefig(os.path.join(output_dir, f'participant_{participant_id}_analysis.pdf'),
+    filename = f'participant_{participant_id}_analysis.pdf'
+    plt.savefig(os.path.join(output_dir, filename),
                bbox_inches='tight')
-    print(f"[SAVED] participant_{participant_id}_analysis.pdf")
+    print(f"[SAVED] {filename}")
     plt.close()
 
 
@@ -349,13 +370,11 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
 # Overall Summary Analysis
 # ============================================================================
 def plot_overall_summary(all_participants_data, output_dir):
-    """生成所有参与者的总体分析图"""
     setup_nature_style()
     
     fig = plt.figure(figsize=(16, 10))
     gs = gridspec.GridSpec(2, 3, hspace=0.3, wspace=0.3)
     
-    # 收集所有数据
     all_trials = []
     participant_summaries = []
     
@@ -363,7 +382,6 @@ def plot_overall_summary(all_participants_data, output_dir):
         participant_info, trials_metrics = process_participant_data(exp_data)
         all_trials.extend(trials_metrics)
         
-        # 参与者级别汇总
         participant_summaries.append({
             'participant_id': participant_info['participant_id'],
             'age': participant_info['age'],
@@ -373,7 +391,6 @@ def plot_overall_summary(all_participants_data, output_dir):
             'avg_trajectory_length': np.mean([t['trajectory_length'] for t in trials_metrics]),
         })
     
-    # ===== (a) 所有参与者的完成时间分布 =====
     ax1 = fig.add_subplot(gs[0, 0])
     
     task_weights = sorted(set([t['task_weight'] for t in all_trials]))
@@ -399,7 +416,6 @@ def plot_overall_summary(all_participants_data, output_dir):
     ax1.set_xticks(range(len(task_weights)))
     ax1.set_xticklabels([f'{tw:.1f}' for tw in task_weights])
     
-    # ===== (b) 轨迹长度分布 =====
     ax2 = fig.add_subplot(gs[0, 1])
     
     data_length = []
@@ -423,7 +439,6 @@ def plot_overall_summary(all_participants_data, output_dir):
     ax2.set_xticks(range(len(task_weights)))
     ax2.set_xticklabels([f'{tw:.1f}' for tw in task_weights])
     
-    # ===== (c) 最终信念准确性 =====
     ax3 = fig.add_subplot(gs[0, 2])
     
     correct_beliefs = []
@@ -447,7 +462,6 @@ def plot_overall_summary(all_participants_data, output_dir):
     ax3.set_ylim(0, 110)
     ax3.legend(loc='best', frameon=False, fontsize=8)
     
-    # ===== (d) 参与者间性能对比 =====
     ax4 = fig.add_subplot(gs[1, 0])
     
     participant_ids = [p['participant_id'] for p in participant_summaries]
@@ -462,7 +476,6 @@ def plot_overall_summary(all_participants_data, output_dir):
     ax4.set_xticks(range(len(participant_ids)))
     ax4.set_xticklabels(participant_ids)
     
-    # ===== (e) 用户输入与机器人动作的关系 =====
     ax5 = fig.add_subplot(gs[1, 1])
     
     for tw, color in zip(task_weights, TASK_WEIGHT_COLORS):
@@ -478,7 +491,6 @@ def plot_overall_summary(all_participants_data, output_dir):
     ax5.set_title('(e) User-Robot Action Relationship', fontsize=12, fontweight='normal')
     ax5.legend(loc='best', frameon=False, fontsize=8)
     
-    # ===== (f) 总体统计表 =====
     ax6 = fig.add_subplot(gs[1, 2])
     ax6.axis('off')
     
@@ -514,7 +526,6 @@ def plot_overall_summary(all_participants_data, output_dir):
 
 
 def print_overall_statistics(all_participants_data):
-    """打印总体统计信息"""
     print("\n" + "="*70)
     print("  OVERALL EXPERIMENT STATISTICS")
     print("="*70)
@@ -524,25 +535,24 @@ def print_overall_statistics(all_participants_data):
         _, trials_metrics = process_participant_data(exp_data)
         all_trials.extend(trials_metrics)
     
-    print(f"\n[1] 总体信息")
-    print(f"  参与者数量: {len(all_participants_data)}")
-    print(f"  总试验次数: {len(all_trials)}")
+    print(f"\n[1] Overall information")
+    print(f"  Participants: {len(all_participants_data)}")
+    print(f"  Total trials: {len(all_trials)}")
     
     task_weights = sorted(set([t['task_weight'] for t in all_trials]))
-    print(f"\n[2] 按Task Weight统计")
+    print(f"\n[2] Statistics by task weight")
     for tw in task_weights:
         trials_tw = [t for t in all_trials if t['task_weight'] == tw]
         print(f"\n  Task Weight {tw:.1f}:")
-        print(f"    试验次数: {len(trials_tw)}")
-        print(f"    完成时间: {np.mean([t['duration'] for t in trials_tw]):.2f}±{np.std([t['duration'] for t in trials_tw]):.2f}s")
-        print(f"    轨迹长度: {np.mean([t['trajectory_length'] for t in trials_tw]):.1f}±{np.std([t['trajectory_length'] for t in trials_tw]):.1f}")
+        print(f"    Trials: {len(trials_tw)}")
+        print(f"    Duration: {np.mean([t['duration'] for t in trials_tw]):.2f}±{np.std([t['duration'] for t in trials_tw]):.2f}s")
+        print(f"    Trajectory length: {np.mean([t['trajectory_length'] for t in trials_tw]):.1f}±{np.std([t['trajectory_length'] for t in trials_tw]):.1f}")
         
-        # 计算信念准确性
         correct = sum(1 for t in trials_tw 
                      if (t['target_goal_idx'] == 0 and t['final_belief_0'] > 0.5) or
                         (t['target_goal_idx'] == 1 and t['final_belief_1'] > 0.5))
         accuracy = correct / len(trials_tw) * 100 if trials_tw else 0
-        print(f"    信念准确率: {accuracy:.1f}%")
+        print(f"    Belief accuracy: {accuracy:.1f}%")
     
     print("\n" + "="*70)
 
@@ -565,14 +575,12 @@ def main():
     
     os.makedirs(args.output, exist_ok=True)
     
-    # 加载数据
     all_data = load_all_experiment_data(args.input)
     
     if len(all_data) == 0:
         print("[ERROR] No data files found!")
         return
     
-    # 打印统计
     print_overall_statistics(all_data)
     
     if args.stats_only:
@@ -580,12 +588,10 @@ def main():
     
     print("\n[Generating figures...]")
     
-    # 为每个参与者生成单独的分析图
-    for exp_data in all_data:
+    for idx, exp_data in enumerate(all_data, start=1):
         participant_info, trials_metrics = process_participant_data(exp_data)
         plot_participant_analysis(participant_info, trials_metrics, args.output)
     
-    # 生成总体汇总图
     plot_overall_summary(all_data, args.output)
     
     print(f"\n[DONE] All figures saved to: {args.output}/")
