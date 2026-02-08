@@ -63,12 +63,11 @@ class LegibleSharedAutonomy:
             angle = base_angle + offset
             candidate = ROBOT_SPEED * np.array([np.cos(angle), np.sin(angle)])
             
-            leg_score = compute_legibility(candidate, state, self.goals, 
-                                          self.beliefs, target_idx)
+            leg_score = compute_legibility(candidate, state, self.goals, target_idx)
             
             task_score = -np.linalg.norm(target_goal - (state + candidate * 0.1))
             
-            score = leg_score + self.task_weight * task_score
+            score =  self.task_weight * leg_score + task_score
             
             if score > best_score:
                 best_score, best_action = score, candidate

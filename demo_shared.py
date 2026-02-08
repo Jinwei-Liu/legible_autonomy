@@ -17,7 +17,7 @@ font_large = pygame.font.Font(None, 48)
 pygame.joystick.init()
 joystick = None
 if pygame.joystick.get_count() > 0:
-    joystick = pygame.joystick.Joystick(0)
+    joystick = pygame.joystick.Joystick(0) 
     joystick.init()
     print(f"Controller connected: {joystick.get_name()}")
 else:

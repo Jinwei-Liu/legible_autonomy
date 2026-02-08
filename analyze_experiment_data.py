@@ -204,7 +204,7 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     for trial in trials_metrics:
         positions = trial['positions']
         task_weight = trial['task_weight']
-        color_idx = [0.1, 0.3, 0.5].index(task_weight)
+        color_idx = [0, 5, 10].index(task_weight)
         color = TASK_WEIGHT_COLORS[color_idx]
         
         ax1.plot(positions[:, 0], positions[:, 1], 
@@ -245,7 +245,7 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
         time_series = trial['time_series']
         betas = trial['betas']
         task_weight = trial['task_weight']
-        color_idx = [0.1, 0.3, 0.5].index(task_weight)
+        color_idx = [0, 5, 10].index(task_weight)
         color = TASK_WEIGHT_COLORS[color_idx]
         
         ax3.plot(time_series, betas, color=color, alpha=0.6, linewidth=1)
