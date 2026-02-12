@@ -197,8 +197,8 @@ def plot_participant_analysis(participant_info, trials_metrics, output_dir):
     ax1 = fig.add_subplot(gs[0, 0])
     
     goal_positions = {
-        0: (400, 100),  # Goal 0 (Top)
-        1: (400, 500),  # Goal 1 (Bottom)
+        0: (650,290),  # Goal 0 (Top)
+        1: (680,310),  # Goal 1 (Bottom)
     }
     
     for trial in trials_metrics:
