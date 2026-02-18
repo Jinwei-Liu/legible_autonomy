@@ -144,11 +144,23 @@ def create_trajectory_animation(participant_id, trials, output_dir, dpi=100, spe
         frames = trial['frames']
         positions = np.array([f['position'] for f in frames])
         
-        # Extract timestamps and convert to seconds from start
+        # Extract timestamps and compute cumulative time (excluding pauses/questionnaires)
         from datetime import datetime
         times = [datetime.fromisoformat(f['time']) for f in frames]
-        start_time = times[0]
-        time_series = np.array([(t - start_time).total_seconds() for t in times])
+        
+        # Compute time differences between consecutive frames
+        # Large gaps (>1s) indicate pauses/questionnaires and should be capped
+        time_series = [0.0]  # Start at 0
+        MAX_FRAME_GAP = 1.0  # Maximum expected time between frames (seconds)
+        
+        for i in range(1, len(times)):
+            dt = (times[i] - times[i-1]).total_seconds()
+            # If gap is too large, it's likely a questionnaire pause - use small value
+            if dt > MAX_FRAME_GAP:
+                dt = 0.033  # ~30 FPS
+            time_series.append(time_series[-1] + dt)
+        
+        time_series = np.array(time_series)
         
         task_weight = trial['task_weight']
         target_goal_idx = trial['target_goal_idx']

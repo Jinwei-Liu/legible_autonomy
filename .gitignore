@@ -3,3 +3,6 @@ experiment_results
 questionnaire_results
 analysis_results
 trajectory_animations
+figures
+generate_setup_figure.py
+beta_heatmap.py

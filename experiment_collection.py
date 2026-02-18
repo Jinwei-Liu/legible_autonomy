@@ -270,7 +270,7 @@ class SubjectiveQuestionnaire:
         self.screen.blit(title_surface, title_rect)
         
         if self.question_index == 0:
-            q_text = "How intuitive was the system's behavior?"
+            q_text = "How intuitive was the robot's behavior?"
             q_surface = self.font_medium.render(q_text, True, WHITE)
             q_rect = q_surface.get_rect(center=(WIDTH // 2, 160))
             self.screen.blit(q_surface, q_rect)
@@ -284,7 +284,7 @@ class SubjectiveQuestionnaire:
             result_rect = result_surface.get_rect(center=(WIDTH // 2, 110))
             self.screen.blit(result_surface, result_rect)
             
-            q_text = "To what extent do you want to collaborate with this system?"
+            q_text = "How well did you collaborate with the robot?"
             q_surface = self.font_medium.render(q_text, True, WHITE)
             q_rect = q_surface.get_rect(center=(WIDTH // 2, 160))
             self.screen.blit(q_surface, q_rect)
