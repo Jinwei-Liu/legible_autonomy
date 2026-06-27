@@ -2,12 +2,6 @@
 
 ---
 
-## Abstract
-
-Shared autonomy systems combine user input with autonomous assistance to help users with motor impairments control robot arms to perform everyday manipulation tasks, by inferring user goals and providing appropriate guidance. However, the robot's internal beliefs about user goals cannot be observed by users. Traditional shared autonomy systems provide assistance along efficient shortest paths toward inferred goals, but when multiple objects lie in similar directions, such assistive motion remains ambiguous and fails to reveal the specific goal identified by the robot. This creates two critical problems. First, when the robot correctly infers the goal, users continue controlling because they cannot perceive understanding from ambiguous assistive motion, wasting effort when autonomous completion would suffice. Second, when the robot misunderstands intent, users cannot quickly detect errors until assistive motion diverges significantly, requiring substantial corrective input. We address this by introducing legible motion into shared autonomy, where robot actions must both advance toward the goal and clearly reveal which goal has been inferred, enabling users to understand the robot's beliefs and adjust control accordingly. The robot modulates communication strength through confidence-aware adaptive authority allocation by providing assertive legible assistive actions when confident while increasing user authority when uncertain, transforming shared autonomy into transparent bidirectional collaboration. User studies including 2D simulation and physical six degree-of-freedom robot arm experiments demonstrate that legible shared autonomy significantly improves users' understanding of robot beliefs and reduces user control effort compared to standard shared autonomy. 
-
----
-
 ## Experimental Setup
 
 <p align="center">
@@ -17,11 +11,11 @@ Shared autonomy systems combine user input with autonomous assistance to help us
 **Design:** Within-subjects study with 20 participants
 
 **Conditions:**
-- λ=0 (Standard SA): Efficient but ambiguous motion
-- λ=5 (Medium Legibility): Balanced approach  
-- λ=10 (High Legibility): Maximum discriminative motion
+- lambda=0 (Standard SA): Efficient but ambiguous motion
+- lambda=5 (Medium Legibility): Balanced approach  
+- lambda=10 (High Legibility): Maximum discriminative motion
 
-**Workspace:** 2D environment (800×600 pixels) with two closely spaced goals creating directional ambiguity
+**Workspace:** 2D environment (800x600 pixels) with two closely spaced goals creating directional ambiguity
 
 ---
 
@@ -69,22 +63,29 @@ Shared autonomy systems combine user input with autonomous assistance to help us
 </p>
 
 **Transparency Metrics:**
-- Understanding rate: 38% → 96-99% (Standard SA → Legible)
-- Statistical significance: χ²(2) = 136.33, p < 0.001
-- Prediction accuracy: 54% → 96-99%
-- Statistical significance: χ²(2) = 89.72, p < 0.001
+- Understanding rate: 38.0% -> 96.0% -> 99.0% (lambda=0, 5, 10)
+- Friedman test: chi2(2) = 28.10, p < 0.001
+- Pairwise Wilcoxon tests with Bonferroni correction: lambda=0 vs 5, p_corr < 0.001; lambda=0 vs 10, p_corr < 0.001; lambda=5 vs 10, p_corr = 0.250 (ns)
+- Prediction accuracy: 54.0% -> 96.0% -> 99.0% (lambda=0, 5, 10)
+- Friedman test: chi2(2) = 29.61, p < 0.001
+- Pairwise Wilcoxon tests with Bonferroni correction: lambda=0 vs 5, p_corr = 0.001; lambda=0 vs 10, p_corr < 0.001; lambda=5 vs 10, p_corr = 0.307 (ns)
 
 **Subjective Experience:**
-- Intuitiveness ratings: 3.90 → 8.35 (1-10 scale)
-- Collaboration ratings: 4.25 → 7.00
+- Intuitiveness ratings: 3.90 -> 6.70 -> 8.35 (1-10 scale)
+- Collaboration ratings: 4.25 -> 7.00 -> 6.95
 - Strong correlation between measures: r = 0.66, p < 0.001
 
 **User Effort (Panel d):**
-- Mean user input norm: λ=0: 8.92 ± 7.71 → λ=5: 4.25 ± 4.60 → λ=10: 3.53 ± 3.51
-- Legible motion reduces user effort by 52% (λ=5) and 60% (λ=10) vs. standard SA
-- Overall effect: Kruskal-Wallis H(2) = 30.68, p < 0.001
-- Pairwise tests (Bonferroni-corrected): λ=0 vs λ=5: p < 0.001 \*\*\*, λ=0 vs λ=10: p < 0.001 \*\*\*, λ=5 vs λ=10: p = 1.000 (ns)
-- Both legible conditions significantly outperform standard SA; no significant difference between the two legibility levels
+- Participant-level mean user input norm: lambda=0: 8.92 +/- 6.36 -> lambda=5: 4.25 +/- 3.36 -> lambda=10: 3.53 +/- 2.40
+- Friedman test: chi2(2) = 21.70, p < 0.001
+- Pairwise Wilcoxon tests with Bonferroni correction: lambda=0 vs 5, p_corr < 0.001; lambda=0 vs 10, p_corr < 0.001; lambda=5 vs 10, p_corr = 0.342 (ns)
+- Both legible conditions significantly reduce user effort relative to standard shared autonomy, with no significant difference between medium and high legibility.
+
+---
+
+## Conclusion
+
+Legible shared autonomy makes robot assistance more interpretable by using motion to reveal the robot's inferred user goal. In the 2D simulation study, legible motion improved transparency and reduced user effort relative to standard shared autonomy. Medium legibility already achieved most of the benefit, suggesting that legibility should be balanced with collaboration quality rather than maximized blindly.
 
 ---
 
@@ -92,7 +93,7 @@ Shared autonomy systems combine user input with autonomous assistance to help us
 
 ```bash
 git clone https://github.com/Jinwei-Liu/legible_shared_autonomy.git
-cd legible_autonomy
+cd legible_shared_autonomy
 conda create -n LSA python=3.10 -y
 conda activate LSA
 python -m pip install numpy pygame matplotlib pandas scipy pillow
