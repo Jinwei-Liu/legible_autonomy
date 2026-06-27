@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import pandas as pd
 from scipy import stats
-from scipy.stats import chi2_contingency, friedmanchisquare, spearmanr, pearsonr, mannwhitneyu, kruskal
+from scipy.stats import friedmanchisquare, spearmanr, pearsonr, wilcoxon
 import os
 from pathlib import Path
 from itertools import combinations
@@ -128,9 +128,10 @@ def extract_trial_metrics(trial):
 
 
 def extract_user_input_data(all_data):
-    """收集所有 trial 的 avg_user_input_norm，按 task_weight 分组"""
+    """Collect participant-level mean user input norm grouped by task weight."""
     values_by_weight = {}
     for participant in all_data:
+        participant_values = {}
         if 'phase1' in participant:
             trials = participant['phase1']['trials']
         elif 'trials' in participant:
@@ -142,11 +143,12 @@ def extract_user_input_data(all_data):
             try:
                 m = extract_trial_metrics(trial)
                 tw = m['task_weight']
-                if tw not in values_by_weight:
-                    values_by_weight[tw] = []
-                values_by_weight[tw].append(m['avg_user_input_norm'])
+                participant_values.setdefault(tw, []).append(m['avg_user_input_norm'])
             except Exception:
                 continue
+
+        for tw, vals in participant_values.items():
+            values_by_weight.setdefault(tw, []).append(float(np.mean(vals)))
 
     return {tw: np.array(v) for tw, v in values_by_weight.items()}
 
@@ -163,35 +165,76 @@ def sig_marker(p):
     return 'ns'
 
 
+def _participant_condition_arrays(rows, value_fn):
+    task_weights = sorted(set([row['task_weight'] for row in rows]))
+    participant_values = {}
+
+    for row in rows:
+        value = value_fn(row)
+        if value is None:
+            continue
+        pid = row['participant_id']
+        tw = row['task_weight']
+        participant_values.setdefault(pid, {}).setdefault(tw, []).append(value)
+
+    complete = [pid for pid, vals in participant_values.items()
+                if all(tw in vals for tw in task_weights)]
+    arrays = [np.array([np.mean(participant_values[pid][tw]) for pid in complete])
+              for tw in task_weights]
+    return task_weights, complete, arrays
+
+
+def _print_friedman_wilcoxon(task_weights, arrays):
+    stat, p_value = friedmanchisquare(*arrays)
+    print(f"\nFriedman test: chi2({len(task_weights)-1})={stat:.4f}, p={p_value:.4f} {sig_marker(p_value)}")
+
+    n_comp = len(list(combinations(task_weights, 2)))
+    pairwise = {}
+    for i, j in combinations(range(len(task_weights)), 2):
+        tw1, tw2 = task_weights[i], task_weights[j]
+        try:
+            w_stat, p_raw = wilcoxon(arrays[i], arrays[j], alternative='two-sided', zero_method='wilcox')
+        except ValueError:
+            w_stat, p_raw = np.nan, 1.0
+        p_corr = min(p_raw * n_comp, 1.0)
+        marker = sig_marker(p_corr)
+        pairwise[(tw1, tw2)] = {'w': w_stat, 'p_raw': p_raw, 'p_corr': p_corr, 'marker': marker}
+        print(f"  {tw1} vs {tw2}: W={w_stat:.4f}, p={p_raw:.4f}, p_corrected={p_corr:.4f} {marker}")
+
+    return {'friedman_stat': stat, 'friedman_p': p_value, 'pairwise': pairwise}
+
+
 def test_understanding_by_task_weight(questionnaire_data):
     print("\n" + "="*70)
     print("  UNDERSTANDING RATE ANALYSIS")
     print("="*70)
 
     task_weights = sorted(set([q['task_weight'] for q in questionnaire_data]))
-    contingency_table = []
     for tw in task_weights:
         tw_data = [q for q in questionnaire_data if q['task_weight'] == tw]
         yes_count = sum(1 for q in tw_data if q['understood'].lower() == 'yes')
-        no_count  = sum(1 for q in tw_data if q['understood'].lower() == 'no')
-        contingency_table.append([yes_count, no_count])
+        no_count = sum(1 for q in tw_data if q['understood'].lower() == 'no')
+        total = yes_count + no_count
         print(f"\nTask Weight {tw}:")
-        print(f"  Yes: {yes_count} ({yes_count/(yes_count+no_count)*100:.1f}%)")
-        print(f"  No:  {no_count} ({no_count/(yes_count+no_count)*100:.1f}%)")
+        print(f"  Yes: {yes_count} ({yes_count/total*100:.1f}%)")
+        print(f"  No:  {no_count} ({no_count/total*100:.1f}%)")
 
-    contingency_table = np.array(contingency_table)
-    chi2, p_value, dof, _ = chi2_contingency(contingency_table)
-    print(f"\nChi-square: χ²={chi2:.4f}, df={dof}, p={p_value:.4f} {sig_marker(p_value)}")
+    def value_fn(q):
+        understood = str(q.get('understood', '')).lower()
+        if understood == 'yes':
+            return 1.0
+        if understood == 'no':
+            return 0.0
+        return None
 
-    for i, j in combinations(range(len(task_weights)), 2):
-        tw1, tw2 = task_weights[i], task_weights[j]
-        table_2x2 = contingency_table[[i, j], :]
-        chi2_pair, p_pair, _, _ = chi2_contingency(table_2x2)
-        n_comp = len(list(combinations(range(len(task_weights)), 2)))
-        p_corr = min(p_pair * n_comp, 1.0)
-        print(f"  {tw1} vs {tw2}: p={p_pair:.4f}, p_corrected={p_corr:.4f} {sig_marker(p_corr)}")
+    task_weights, complete, arrays = _participant_condition_arrays(questionnaire_data, value_fn)
+    print(f"\nParticipant-level repeated-measures analysis (N={len(complete)})")
+    for tw, values in zip(task_weights, arrays):
+        print(f"  Task Weight {tw}: Mean={np.mean(values):.3f}, SD={np.std(values, ddof=1):.3f}")
 
-    return {'chi2': chi2, 'p_value': p_value, 'dof': dof, 'contingency_table': contingency_table}
+    results = _print_friedman_wilcoxon(task_weights, arrays)
+    results.update({'task_weights': task_weights, 'n_participants': len(complete)})
+    return results
 
 
 def test_prediction_accuracy_by_task_weight(questionnaire_data):
@@ -200,27 +243,26 @@ def test_prediction_accuracy_by_task_weight(questionnaire_data):
     print("="*70)
 
     task_weights = sorted(set([q['task_weight'] for q in questionnaire_data]))
-    contingency_table = []
     for tw in task_weights:
         tw_data = [q for q in questionnaire_data if q['task_weight'] == tw]
-        correct = sum(1 for q in tw_data if q['predicted_goal'] == q['actual_goal'])
-        total   = len([q for q in tw_data if q['predicted_goal'] is not None])
-        contingency_table.append([correct, total - correct])
+        valid = [q for q in tw_data if q['predicted_goal'] is not None]
+        correct = sum(1 for q in valid if q['predicted_goal'] == q['actual_goal'])
+        total = len(valid)
         print(f"\nTask Weight {tw}: correct={correct}/{total} ({correct/total*100:.1f}%)")
 
-    contingency_table = np.array(contingency_table)
-    chi2, p_value, dof, _ = chi2_contingency(contingency_table)
-    print(f"\nChi-square: χ²={chi2:.4f}, df={dof}, p={p_value:.4f} {sig_marker(p_value)}")
+    def value_fn(q):
+        if q.get('predicted_goal') is None:
+            return None
+        return 1.0 if q['predicted_goal'] == q['actual_goal'] else 0.0
 
-    for i, j in combinations(range(len(task_weights)), 2):
-        tw1, tw2 = task_weights[i], task_weights[j]
-        table_2x2 = contingency_table[[i, j], :]
-        chi2_pair, p_pair, _, _ = chi2_contingency(table_2x2)
-        n_comp = len(list(combinations(range(len(task_weights)), 2)))
-        p_corr = min(p_pair * n_comp, 1.0)
-        print(f"  {tw1} vs {tw2}: p={p_pair:.4f}, p_corrected={p_corr:.4f} {sig_marker(p_corr)}")
+    task_weights, complete, arrays = _participant_condition_arrays(questionnaire_data, value_fn)
+    print(f"\nParticipant-level repeated-measures analysis (N={len(complete)})")
+    for tw, values in zip(task_weights, arrays):
+        print(f"  Task Weight {tw}: Mean={np.mean(values):.3f}, SD={np.std(values, ddof=1):.3f}")
 
-    return {'chi2': chi2, 'p_value': p_value, 'dof': dof, 'contingency_table': contingency_table}
+    results = _print_friedman_wilcoxon(task_weights, arrays)
+    results.update({'task_weights': task_weights, 'n_participants': len(complete)})
+    return results
 
 
 def test_phase2_ratings(phase2_df):
@@ -288,8 +330,8 @@ def test_phase2_ratings(phase2_df):
 
 def test_user_input_norm(values_by_weight):
     """
-    Kruskal-Wallis (overall) + pairwise Mann-Whitney U (Bonferroni) for panel (d)
-    Returns dict of pairwise results for significance bar drawing
+    Friedman (overall) + pairwise Wilcoxon signed-rank (Bonferroni) for panel (d).
+    Input values are participant-level condition means.
     """
     print("\n" + "="*70)
     print("  USER INPUT NORM ANALYSIS (Panel d)")
@@ -297,21 +339,11 @@ def test_user_input_norm(values_by_weight):
 
     task_weights = sorted(values_by_weight.keys())
     arrays = [values_by_weight[tw] for tw in task_weights]
+    for tw, vals in zip(task_weights, arrays):
+        print(f"Task Weight {tw}: Mean={np.mean(vals):.4f}, SD={np.std(vals, ddof=1):.4f}, N={len(vals)}")
 
-    stat, p = kruskal(*arrays)
-    print(f"\nKruskal-Wallis: H={stat:.4f}, p={p:.4f} {sig_marker(p)}")
-
-    n_comp = len(list(combinations(task_weights, 2)))
-    pairwise = {}
-    for tw1, tw2 in combinations(task_weights, 2):
-        u, p_raw = mannwhitneyu(values_by_weight[tw1], values_by_weight[tw2],
-                                alternative='two-sided')
-        p_corr = min(p_raw * n_comp, 1.0)
-        marker = sig_marker(p_corr)
-        pairwise[(tw1, tw2)] = {'u': u, 'p_raw': p_raw, 'p_corr': p_corr, 'marker': marker}
-        print(f"  {tw1} vs {tw2}: U={u:.1f}, p={p_raw:.4f}, p_corrected={p_corr:.4f} {marker}")
-
-    return {'kruskal_stat': stat, 'kruskal_p': p, 'pairwise': pairwise}
+    results = _print_friedman_wilcoxon(task_weights, arrays)
+    return results
 
 
 # ==================== VISUALIZATION ====================
@@ -569,11 +601,14 @@ def plot_combined_figure(questionnaire_data, phase2_df, values_by_weight,
 
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True)
-    output_file = output_path / 'combined_figure.pdf'
-    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    output_pdf = output_path / 'combined_figure.pdf'
+    output_png = output_path / 'combined_figure.png'
+    plt.savefig(output_pdf, dpi=300, bbox_inches='tight')
+    plt.savefig(output_png, dpi=300, bbox_inches='tight')
     plt.close()
 
-    print(f"\n[SAVED] {output_file}")
+    print(f"\n[SAVED] {output_pdf}")
+    print(f"[SAVED] {output_png}")
 
 
 # ==================== MAIN ====================
@@ -627,7 +662,7 @@ def main():
     print("\n" + "="*70)
     print("  COMPLETE")
     print("="*70)
-    print(f"Figure saved to: {args.output}/combined_figure.pdf")
+    print(f"Figures saved to: {args.output}/combined_figure.pdf and {args.output}/combined_figure.png")
 
 if __name__ == '__main__':
     main()
