@@ -11,11 +11,11 @@
 **Design:** Within-subjects study with 20 participants
 
 **Conditions:**
-- lambda=0 (Standard SA): Efficient but ambiguous motion
-- lambda=5 (Medium Legibility): Balanced approach  
-- lambda=10 (High Legibility): Maximum discriminative motion
+- $\lambda=0$ (Standard SA): Efficient but ambiguous motion
+- $\lambda=5$ (Medium Legibility): Balanced approach  
+- $\lambda=10$ (High Legibility): Maximum discriminative motion
 
-**Workspace:** 2D environment (800x600 pixels) with two closely spaced goals creating directional ambiguity
+**Workspace:** 2D environment ($800\times600$ pixels) with two closely spaced goals creating directional ambiguity
 
 ---
 
@@ -63,29 +63,23 @@
 </p>
 
 **Transparency Metrics:**
-- Understanding rate: 38.0% -> 96.0% -> 99.0% (lambda=0, 5, 10)
-- Friedman test: chi2(2) = 28.10, p < 0.001
-- Pairwise Wilcoxon tests with Bonferroni correction: lambda=0 vs 5, p_corr < 0.001; lambda=0 vs 10, p_corr < 0.001; lambda=5 vs 10, p_corr = 0.250 (ns)
-- Prediction accuracy: 54.0% -> 96.0% -> 99.0% (lambda=0, 5, 10)
-- Friedman test: chi2(2) = 29.61, p < 0.001
-- Pairwise Wilcoxon tests with Bonferroni correction: lambda=0 vs 5, p_corr = 0.001; lambda=0 vs 10, p_corr < 0.001; lambda=5 vs 10, p_corr = 0.307 (ns)
+- Understanding rate: $38.0\% \rightarrow 96.0\% \rightarrow 99.0\%$ ($\lambda=0,5,10$)
+- Friedman test: $\chi^2(2)=28.10$, $p<0.001$
+- Pairwise Wilcoxon tests with Bonferroni correction: $\lambda=0$ vs. $\lambda=5$, $p_{\mathrm{corr}}<0.001$; $\lambda=0$ vs. $\lambda=10$, $p_{\mathrm{corr}}<0.001$; $\lambda=5$ vs. $\lambda=10$, $p_{\mathrm{corr}}=0.250$ (ns)
+- Prediction accuracy: $54.0\% \rightarrow 96.0\% \rightarrow 99.0\%$ ($\lambda=0,5,10$)
+- Friedman test: $\chi^2(2)=29.61$, $p<0.001$
+- Pairwise Wilcoxon tests with Bonferroni correction: $\lambda=0$ vs. $\lambda=5$, $p_{\mathrm{corr}}=0.001$; $\lambda=0$ vs. $\lambda=10$, $p_{\mathrm{corr}}<0.001$; $\lambda=5$ vs. $\lambda=10$, $p_{\mathrm{corr}}=0.307$ (ns)
 
 **Subjective Experience:**
-- Intuitiveness ratings: 3.90 -> 6.70 -> 8.35 (1-10 scale)
-- Collaboration ratings: 4.25 -> 7.00 -> 6.95
-- Strong correlation between measures: r = 0.66, p < 0.001
+- Intuitiveness ratings: $3.90 \rightarrow 6.70 \rightarrow 8.35$ (1-10 scale)
+- Collaboration ratings: $4.25 \rightarrow 7.00 \rightarrow 6.95$
+- Strong correlation between measures: $r=0.66$, $p<0.001$
 
 **User Effort (Panel d):**
-- Participant-level mean user input norm: lambda=0: 8.92 +/- 6.36 -> lambda=5: 4.25 +/- 3.36 -> lambda=10: 3.53 +/- 2.40
-- Friedman test: chi2(2) = 21.70, p < 0.001
-- Pairwise Wilcoxon tests with Bonferroni correction: lambda=0 vs 5, p_corr < 0.001; lambda=0 vs 10, p_corr < 0.001; lambda=5 vs 10, p_corr = 0.342 (ns)
+- Participant-level mean user input norm: $\lambda=0$: $8.92\pm6.36$ $\rightarrow$ $\lambda=5$: $4.25\pm3.36$ $\rightarrow$ $\lambda=10$: $3.53\pm2.40$
+- Friedman test: $\chi^2(2)=21.70$, $p<0.001$
+- Pairwise Wilcoxon tests with Bonferroni correction: $\lambda=0$ vs. $\lambda=5$, $p_{\mathrm{corr}}<0.001$; $\lambda=0$ vs. $\lambda=10$, $p_{\mathrm{corr}}<0.001$; $\lambda=5$ vs. $\lambda=10$, $p_{\mathrm{corr}}=0.342$ (ns)
 - Both legible conditions significantly reduce user effort relative to standard shared autonomy, with no significant difference between medium and high legibility.
-
----
-
-## Conclusion
-
-Legible shared autonomy makes robot assistance more interpretable by using motion to reveal the robot's inferred user goal. In the 2D simulation study, legible motion improved transparency and reduced user effort relative to standard shared autonomy. Medium legibility already achieved most of the benefit, suggesting that legibility should be balanced with collaboration quality rather than maximized blindly.
 
 ---
 
