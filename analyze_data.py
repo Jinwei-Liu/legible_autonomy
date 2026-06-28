@@ -153,6 +153,27 @@ def extract_user_input_data(all_data):
     return {tw: np.array(v) for tw, v in values_by_weight.items()}
 
 
+def extract_user_input_trial_data(all_data):
+    """Collect trial-level mean user input norm grouped by task weight for plotting."""
+    values_by_weight = {}
+    for participant in all_data:
+        if 'phase1' in participant:
+            trials = participant['phase1']['trials']
+        elif 'trials' in participant:
+            trials = participant['trials']
+        else:
+            continue
+
+        for trial in trials:
+            try:
+                m = extract_trial_metrics(trial)
+                values_by_weight.setdefault(m['task_weight'], []).append(m['avg_user_input_norm'])
+            except Exception:
+                continue
+
+    return {tw: np.array(v) for tw, v in values_by_weight.items()}
+
+
 # ==================== STATISTICAL TESTS ====================
 
 def sig_marker(p):
@@ -636,11 +657,13 @@ def main():
     questionnaire_data = extract_questionnaire_data(all_data)
     phase2_df          = extract_phase2_data(all_data)
     values_by_weight   = extract_user_input_data(all_data)
+    trial_values_by_weight = extract_user_input_trial_data(all_data)
 
     print(f"\nFound {len(all_data)} participants")
     print(f"Found {len(questionnaire_data)} questionnaire responses")
     print(f"Found {len(phase2_df)} phase2 ratings")
-    print(f"Found user input data for task weights: {sorted(values_by_weight.keys())}")
+    print(f"Found participant-level user input data for task weights: {sorted(values_by_weight.keys())}")
+    print(f"Found trial-level user input data for task weights: {sorted(trial_values_by_weight.keys())}")
 
     # 统计检验
     test_understanding_by_task_weight(questionnaire_data)
@@ -650,7 +673,7 @@ def main():
 
     # 生成图
     plot_combined_figure(
-        questionnaire_data, phase2_df, values_by_weight,
+        questionnaire_data, phase2_df, trial_values_by_weight,
         user_input_results['pairwise'],
         args.output,
         font_size=args.font_size,
